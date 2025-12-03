@@ -1,0 +1,16 @@
+__pycache__
+app.egg-info
+*.pyc
+.mypy_cache
+.coverage
+htmlcov
+.cache
+.venv
+venv
+.vscode
+main2.py
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+backend/venv
