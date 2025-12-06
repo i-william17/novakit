@@ -1,6 +1,8 @@
 from app.common.base.base_model import BaseModel
+from app.common.utils.status_mixin import StatusMixin
 
-class IamBaseModel(BaseModel):
+
+class IamBaseModel(BaseModel, StatusMixin):
     __abstract__ = True
 
     # extra IAM features here

@@ -47,3 +47,14 @@ def require_permission(permission_name: str):
         # TODO: integrate with your RBAC (authManager.getPermissionsByUser)
         return True
     return _checker
+
+#
+# from fastapi import Depends
+# from app.core.nova import nova
+# from app.modules.iam.security.auth import decode_token
+#
+#
+# async def get_current_user(token: str = Depends(oauth2_scheme)):
+#     user = await decode_token(token)
+#     nova.user.set(user)     # <--- THE MAGIC
+#     return user

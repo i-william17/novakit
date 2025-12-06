@@ -21,3 +21,34 @@ class RefreshToken(IamBaseModel):
     data: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     user = relationship("User", back_populates="refresh_tokens")
+
+
+# You already store refresh tokens.
+# Now extend them:
+#
+# Add fields:
+#
+# device_name
+#
+# browser
+#
+# device_fingerprint
+#
+# ip
+#
+# location_country
+#
+# last_used_at
+
+
+
+# login_logs:
+#   id
+#   user_id (nullable)
+#   ip
+#   country
+#   device
+#   fingerprint
+#   status (success/failed)
+#   reason (e.g., otp_required, blocked, suspicious)
+#   created_at
