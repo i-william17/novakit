@@ -5,7 +5,7 @@ from app.common.db.sessions import get_db
 from app.core.base_controller import BaseController
 from app.modules.main.services.setting_service import SettingService
 from pydantic import ValidationError
-from app.core.__config import config
+from config import config
 
 from app.modules.main.hooks.settings_loader import SettingLoader
 
