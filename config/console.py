@@ -18,7 +18,7 @@ class ConsoleConfig(BaseSettings):
     CONTROLLER_NAMESPACE: str = "app.console.controllers"
 
     CONTROLLER_MAP: dict = {
-        "nova": {
+        "nova.py": {
             "class": "app.console.controllers.NovaController",
             "migration_path": "app/migrations",
             "template_file": "app/templates/migration.py",

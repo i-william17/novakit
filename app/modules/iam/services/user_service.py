@@ -2,25 +2,28 @@ import uuid
 import hashlib
 from typing import Optional, TYPE_CHECKING
 
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request
+# from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.iam.hooks.security import hash_password, verify_password
 from app.modules.iam.hooks.jwt_utils import decode_jwt
 from app.common.db.sessions import get_db
+from app.modules.iam.models.profile import Profile
 
 from app.modules.iam.repositories.user_repository import UserRepository
 from app.modules.iam.models.user import User
 from app.modules.iam.hooks.user_status import UserStatus
 from app.modules.iam.models.password_history import PasswordHistory
+from app.modules.iam.schemas.user import UserCreate
 
 if TYPE_CHECKING:
     from app.modules.iam.schemas.auth import ChangePasswordInput
 
 
 repo = UserRepository()
-bearer_scheme = HTTPBearer()
+# bearer_scheme = HTTPBearer()
 
 
 # ---------------------------------------------------------
@@ -44,6 +47,62 @@ class UserService:
 
     async def find_by_jti(self, db: AsyncSession, jti: str):
         return await repo.get_by_jti(db, jti)
+
+    async def register_user(self, db: AsyncSession, data: UserCreate) -> User:
+        """
+        Register a user with a required profile
+        """
+        # --------------------------------
+        # 1. Business validations
+        # --------------------------------
+        if await repo.username_exists(db, data.username):
+            raise ValueError("Username already taken")
+
+        if await repo.email_exists(db, data.profile.email_address):
+            raise ValueError("Email already registered")
+
+        if await repo.phone_exists(db, data.profile.phone_number):
+            raise ValueError("Phone number already registered")
+
+        try:
+            # --------------------------------
+            # Create Profile
+            # --------------------------------
+            profile_id = uuid.uuid4().hex
+
+            profile = Profile(
+                id=profile_id,
+                first_name=data.profile.first_name,
+                middle_name=data.profile.middle_name,
+                last_name=data.profile.last_name,
+                email_address=data.profile.email_address,
+                phone_number=data.profile.phone_number,
+            )
+
+            # --------------------------------
+            # Create User
+            # --------------------------------
+            user = User(
+                username=data.username,
+                profile_id=profile_id,
+                password_hash=hash_password(data.password),
+                status=10,
+            )
+
+            db.add_all([profile, user])
+            await db.commit()
+            await db.refresh(user)
+
+            return user
+
+        except IntegrityError:
+            await db.rollback()
+            # DB-level safety net
+            raise ValueError("User already exists")
+
+        except Exception:
+            await db.rollback()
+            raise
 
     # -----------------------------------------------------
     # Password history helpers
@@ -70,7 +129,8 @@ class UserService:
         """
 
         # Step 1: find user
-        user = await repo.get_by_username(db, email_or_username)
+        # user = await repo.get_by_username(db, email_or_username)
+        user = await repo.get_by_username_or_email(db, email_or_username)
 
         if not user:
             # If you later add get_by_email — also check email here
@@ -145,21 +205,21 @@ class UserService:
     # Require Login (FastAPI dependency)
     # -----------------------------------------------------
     async def require_login(
-        self,
-        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-        db: AsyncSession = Depends(get_db),
+            self,
+            request: Request,
+            db: AsyncSession = Depends(get_db),
     ) -> User:
 
-        if not credentials:
-            raise HTTPException(status_code=401, detail="Token missing")
+        auth = getattr(request.state, "auth", None)
 
-        payload = decode_jwt(credentials.credentials)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
+        if not auth:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
+        payload = auth["payload"]
         user_id = payload.get("sub")
+
         if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token format")
+            raise HTTPException(status_code=401, detail="Invalid token payload")
 
         user = await repo.get_by_id(db, user_id)
         if not user:

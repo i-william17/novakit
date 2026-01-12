@@ -7,12 +7,10 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.base_controller import BaseController, route
-from app.common.router import create_module_router
+from app.core.router import create_module_router
 
 from app.modules.iam.schemas.user import (
     UserOut,
-    UserCreate,
-    UserBase,
 )
 from app.modules.iam.repositories.user_repository import UserRepository
 from app.modules.iam.services.user_service import UserService
@@ -43,11 +41,12 @@ class UserController(BaseController):
         self,
         q: UserSearch = Depends(),
         db: AsyncSession = Depends(get_db),
-        current_user=Depends(require_permission("iamUsers")),
+        # current_user=Depends(require_permission("iamUsers")),
     ):
         page = await q.search(db)
         return JSONResponse(
-            content={"data": page, "oneRecord": False},
+            # content={"data": page, "oneRecord": False},
+            content={"data": "Users ", "oneRecord": False},
             status_code=status.HTTP_200_OK,
         )
 

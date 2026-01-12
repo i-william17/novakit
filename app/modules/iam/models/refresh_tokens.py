@@ -6,6 +6,7 @@ from app.modules.iam.hooks.base_model import IamBaseModel
 class RefreshToken(IamBaseModel):
     __tablename__ = "refresh_tokens"
 
+    __mapper_args__ = {"exclude_properties": ["is_deleted"]}
     id = None
 
     token_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -16,9 +17,8 @@ class RefreshToken(IamBaseModel):
     )
 
     token: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    ip: Mapped[str] = mapped_column(String(32), server_default="127.0.0.1")
+    ip_address: Mapped[str] = mapped_column(String(32), server_default="127.0.0.1")
     user_agent: Mapped[str] = mapped_column(String, nullable=False)
-    data: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     user = relationship("User", back_populates="refresh_tokens")
 

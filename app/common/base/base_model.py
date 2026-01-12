@@ -1,6 +1,6 @@
-from sqlalchemy.orm import DeclarativeBase, declared_attr, Mapped, mapped_column
-from sqlalchemy import DateTime, Boolean, func
-import uuid
+import time
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import Integer
 
 
 class Base(DeclarativeBase):
@@ -10,26 +10,15 @@ class Base(DeclarativeBase):
 class BaseModel(Base):
     __abstract__ = True
 
-    @declared_attr
-    def id(cls) -> Mapped[uuid.UUID]:
-        return mapped_column(
-            primary_key=True,
-            default=uuid.uuid4,
-            unique=True
-        )
-
-    created_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now()
+    created_at: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=lambda: int(time.time()),
     )
 
-    updated_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True),
-        onupdate=func.now(),
-        nullable=True
-    )
-
-    is_deleted: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False
+    updated_at: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=lambda: int(time.time()),
+        onupdate=lambda: int(time.time()),
     )

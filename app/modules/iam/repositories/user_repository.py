@@ -1,4 +1,5 @@
 import uuid
+from sqlalchemy import or_
 from typing import Optional
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +32,24 @@ class UserRepository:
         )
         return q.scalar_one_or_none()
 
+    async def get_by_username_or_email(
+            self,
+            db: AsyncSession,
+            identifier: str,
+    ) -> Optional[User]:
+        q = await db.execute(
+            select(User)
+            .join(Profile)
+            .where(
+                User.status == UserStatus.ACTIVE,
+                or_(
+                    User.username == identifier,
+                    Profile.email_address == identifier,
+                ),
+            )
+        )
+        return q.scalar_one_or_none()
+
     async def get_by_jti(self, db: AsyncSession, jti: str) -> Optional[User]:
         q = await db.execute(
             select(User).where(
@@ -49,10 +68,12 @@ class UserRepository:
     # ──────────── Refresh Tokens ─────────────
 
     async def get_refresh_token(self, db: AsyncSession, user: User):
-        q = await db.execute(
-            select(RefreshToken).where(RefreshToken.user_id == user.user_id)
+        result = await db.execute(
+            select(RefreshToken)
+            .where(RefreshToken.user_id == user.user_id)
+            .limit(1)
         )
-        return q.scalars().all()
+        return result.scalars().first()
 
     async def purge_refresh_tokens(self, db: AsyncSession, user_id: uuid.UUID):
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
@@ -78,3 +99,21 @@ class UserRepository:
             )
         )
         return q.scalar_one_or_none()
+
+    async def username_exists(self, db: AsyncSession, username: str) -> bool:
+        q = await db.execute(
+            select(User.user_id).where(User.username == username)
+        )
+        return q.scalar_one_or_none() is not None
+
+    async def email_exists(self, db: AsyncSession, email: str) -> bool:
+        q = await db.execute(
+            select(Profile.id).where(Profile.email_address == email)
+        )
+        return q.scalar_one_or_none() is not None
+
+    async def phone_exists(self, db: AsyncSession, phone: str) -> bool:
+        q = await db.execute(
+            select(Profile.id).where(Profile.phone_number == phone)
+        )
+        return q.scalar_one_or_none() is not None

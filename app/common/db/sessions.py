@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine
 )
-from config.config import settings  
+from config.config import settings
 
 logger = logging.getLogger("app.db")
 
@@ -45,7 +45,7 @@ def _normalize_db_url_for_async(url: str) -> str:
 # ---------------------------------------------------------
 # Initialize DB engine (called on startup)
 # ---------------------------------------------------------
-async def init_db(echo: bool | None = None):
+async def init_db(app=None, echo: bool | None = None):
     global engine, AsyncSessionLocal
 
     if engine is not None:
@@ -80,6 +80,11 @@ async def init_db(echo: bool | None = None):
         class_=AsyncSession
     )
 
+    # REGISTER INTO app.state
+    if app is not None:
+        app.state.db_engine = engine
+        app.state.db_sessionmaker = AsyncSessionLocal
+
     # Test connection
     try:
         async with engine.begin() as conn:
@@ -109,9 +114,23 @@ async def close_db():
 # ---------------------------------------------------------
 # DB Dependency for FastAPI
 # ---------------------------------------------------------
+# async def get_db() -> AsyncGenerator[AsyncSession, None]:
+#     if not AsyncSessionLocal:
+#         raise RuntimeError("DB not initialized — call init_db() first.")
+#
+#     async with AsyncSessionLocal() as session:
+#         try:
+#             yield session
+#             await session.commit()
+#         except Exception:
+#             await session.rollback()
+#             raise
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     if not AsyncSessionLocal:
         raise RuntimeError("DB not initialized — call init_db() first.")
 
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            await session.close()

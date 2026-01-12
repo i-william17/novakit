@@ -1,10 +1,10 @@
 import uuid
-from fastapi import Depends, Request, Response, status
+from fastapi import Depends, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.base_controller import BaseController, route
-from app.common.router import create_module_router
+from app.core.router import create_module_router
 
 from app.common.db.sessions import get_db
 from app.core.security.brute_force import BruteForceService
@@ -21,13 +21,13 @@ from app.modules.iam.schemas.auth import (
 
 from app.modules.iam.hooks.security import (
     generate_jwt_access_token,
-    verify_password,
     hash_password
 )
 
 from app.modules.iam.repositories.user_repository import UserRepository
-from app.modules.iam.services import user_service
-from app.modules.iam.services.user_service import UserService
+from app.modules.iam.schemas.user import UserCreate
+from app.modules.iam.schemas.user_response import UserResponse
+from app.modules.iam.services.user_service import UserService, repo
 
 
 class AuthController(BaseController):
@@ -75,7 +75,11 @@ class AuthController(BaseController):
         # 1. Check if user/IP is blocked
         # -------------------------------------------
         block = await BruteForceService.is_blocked(username, client_ip)
+        print("LOGIN BLOCK:", block)
         if block["user_blocked"] or block["ip_blocked"]:
+            if block["ip_blocked"]:
+                print(f"BLOCKED IP {client_ip} (brute-force / scatter)")
+
             return self.error_response(
                 errors="Too many failed login attempts. Try again later.",
                 status_code=429
@@ -89,10 +93,13 @@ class AuthController(BaseController):
         )
 
         if errors:
+            await BruteForceService.register_failure(username, client_ip)
             return self.error_response(
                 errors=errors,
                 status_code=422
             )
+
+        await BruteForceService.reset(username, client_ip)
 
         # Generate Access Token
         access_token = generate_jwt_access_token(user)
@@ -104,13 +111,47 @@ class AuthController(BaseController):
         return self.payload_response(
             data={
                 "access_token": access_token,
-                "userData": user.myData,  # your custom property
+                "userData": user.username,  # your custom property
             },
             meta={
                 "statusCode": 200,
                 "message": "Access granted",
                 "type": "toast",
             },
+        )
+
+    # ------------------------------------------------------
+    # REGISTER
+    # ------------------------------------------------------
+    @route("post", "/register", summary="Register user")
+    async def register(
+            self,
+            body: UserCreate,
+            db: AsyncSession = Depends(get_db),
+    ):
+        try:
+            user = await self.user_service.register_user(db, body)
+
+            # load profile explicitly
+            profile = await repo.get_profile(db, user)
+
+            response = UserResponse(
+                user_id=user.user_id,
+                username=user.username,
+                status=user.status,
+                profile=profile,
+            )
+        except ValueError as exc:
+            return self.error_response(str(exc), status_code=422)
+
+        return self.payload_response(
+            data=response.model_dump_json(),
+            meta={
+                "statusCode": 201,
+                "message": "Account created successfully",
+                "type": "toast",
+            },
+            status_code=201,
         )
 
     # ------------------------------------------------------
@@ -260,7 +301,7 @@ class AuthController(BaseController):
         })
 
     # ------------------------------------------------------
-    # GENERATE REFRESH TOKEN (Yii2 style)
+    # GENERATE REFRESH TOKEN
     # ------------------------------------------------------
     async def generate_refresh_token(
         self,
@@ -270,17 +311,17 @@ class AuthController(BaseController):
         db: AsyncSession
     ):
         ua = request.headers.get("User-Agent", "unknown")
-        ip = request.client.host
+        ip_address = request.client.host
 
-        existing = await self.user_repo.get_refresh_token(db, user.id)
+        existing = await self.user_repo.get_refresh_token(db, user)
 
         if not existing:
             refresh_token = uuid.uuid4().hex + uuid.uuid4().hex
             token_model = RefreshToken(
-                user_id=user.id,
+                user_id=user.user_id,
                 token=refresh_token,
                 user_agent=ua,
-                ip=ip,
+                ip_address=ip_address,
             )
             db.add(token_model)
         else:

@@ -57,14 +57,24 @@ class CommonConfig(BaseSettings):
     BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
     
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     FRONTEND_HOST: str = "http://localhost:5173"
 
-    BACKEND_CORS_ORIGINS: Annotated[
-        list[AnyUrl] | str, BeforeValidator(parse_cors)
-    ] = []
+    # Safe endpoints (comma-separated string)
+    SAFE_ENDPOINTS: str = "/,/docs,/openapi.json"
+
+    @property
+    def safe_endpoints(self) -> set[str]:
+        if not self.SAFE_ENDPOINTS:
+            return set()
+
+        return {
+            ep.strip().rstrip("/")
+            for ep in self.SAFE_ENDPOINTS.split(",")
+            if ep.strip()
+        }
 
     @computed_field
     @property
@@ -85,11 +95,23 @@ class CommonConfig(BaseSettings):
     # ============================================================
     SECRET_KEY: str = secrets.token_urlsafe(32)
 
-    JWT_SECRET_KEY: str = "supersecretkey123"
+    JWT_SECRET_KEY: str = "836abbf2d3ddf8555e88cc3b84ddb863205f26f51d2edccee5918b6902507362"
     JWT_ALGORITHM: str = "HS256"
 
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    BRUTE_FORCE_ATTEMPTS: int = 5
+    BRUTE_FORCE_WINDOW: int = 300
+    BRUTE_FORCE_LOCKOUT: int = 600
+
+    # Brute / IP blocking
+    IP_DISTINCT_USERNAME_THRESHOLD: int = 10
+    IP_DISTINCT_WINDOW: int = 300  # seconds
+    IP_BLOCK_LOCKOUT: int = 3600  # seconds
+
+    # toggles
+    ENABLE_IP_BLOCKING: bool = True
+    ENABLE_BRUTE_FORCE_PROTECTION : bool = True
 
     # Superuser
     FIRST_SUPERUSER: EmailStr

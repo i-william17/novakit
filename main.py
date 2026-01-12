@@ -1,3 +1,7 @@
+from scalar_fastapi import (
+    get_scalar_api_reference,
+    Layout,
+)
 import logging
 import sentry_sdk
 from fastapi import FastAPI
@@ -7,15 +11,16 @@ from contextlib import asynccontextmanager
 
 from app.core.kernel import boot
 from app.common.db.sessions import close_db
-from app.api.main import api_router   
-from config.config import settings  
-from app.core.router_registry import register_routes  # optional existing router registry
+from app.core.security.auth_middleware import AuthMiddleware
+from config.config import settings
+from app.core.router_registry import register_routes
+from prometheus_fastapi_instrumentator import Instrumentator
 
 logger = logging.getLogger("novakit.main")
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    """Keep the original unique id generator used in the template."""
+    """unique id generator used in the template."""
     tags = route.tags or ["default"]
     return f"{tags[0]}-{route.name}"
 
@@ -30,6 +35,8 @@ async def lifespan(app: FastAPI):
         logger.info("Booting application...")
         # If your boot() expects `app` pass it; adjust as needed.
         await boot(app)
+        register_routes(app)
+        logger.info("Routes registered.")
         yield
     except Exception:
         logger.exception("Error during startup")
@@ -51,9 +58,17 @@ app = FastAPI(
     version=getattr(settings, "APP_VERSION", None),
     description=getattr(settings, "APP_DESCRIPTION", None),
     openapi_url=f"{getattr(settings, 'API_V1_STR', '/api/v1')}/openapi.json",
+
+    # Disable default docs
+    # docs_url=None,
+    # redoc_url=None,
+
     generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )
+
+
+Instrumentator().instrument(app).expose(app)
 
 # ------------------------------
 # Sentry (optional)
@@ -83,23 +98,67 @@ if cors_origins:
     )
     logger.info("CORS middleware installed.")
 
+app.add_middleware(
+    AuthMiddleware,
+    safe_endpoints=settings.safe_endpoints,
+    secret_key=getattr(settings, "SECRET_KEY", None),
+    algorithm=getattr(settings, "JWT_ALGORITHM", "HS256"),
+    allow_cookie_refresh=True,  # Accept refresh_token from cookies if needed
+)
+logger.info("Auth middleware installed.")
 
-# ------------------------------
-# Include routers (API + module routes)
-# ------------------------------
-# Keep your existing api_router (if you still use it)
-if "api_router" in globals() and api_router:
-    app.include_router(api_router, prefix=getattr(settings, "API_V1_STR", "/api/v1"))
-    logger.info("Included api_router at %s", getattr(settings, "API_V1_STR", "/api/v1"))
 
-# If you have a central register_routes function (your MVC router registry),
+# 4) Register remaining middlewares via registry (this enforces order)
+# try:
+#     register_middlewares(app)
+# except Exception as exc:
+#     import logging
+#     .getLogger("novakit.main").critical("Middleware registration failed: %s", exc)
+#     raise
+
+
+# If you have a central register_routes function,
 # call it here to register controllers that use your own pattern.
-try:
-    register_routes(app)  # your function should add routers to `app`
-    logger.info("Registered routes via register_routes().")
-except Exception:
-    logger.debug("register_routes() not found or raised — continuing.")
+# try:
+#     register_routes(app)  # your function should add routers to `app`
+#     logger.info("Registered routes via register_routes().")
+# except Exception:
+#     logger.debug("register_routes() not found or raised — continuing.")
 
+
+# ------------------------------
+# OpenAPI (Swagger) – Bearer JWT
+# ------------------------------
+# def custom_openapi():
+#     if app.openapi_schema:
+#         return app.openapi_schema
+#
+#     openapi_schema = get_openapi(
+#         title=settings.APP_NAME,
+#         version=settings.APP_VERSION,
+#         description=settings.APP_DESCRIPTION,
+#         routes=app.routes,
+#     )
+#
+#     openapi_schema.setdefault("components", {})
+#     openapi_schema["components"]["securitySchemes"] = {
+#         "BearerAuth": {
+#             "type": "http",
+#             "scheme": "bearer",
+#             "bearerFormat": "JWT",
+#         }
+#     }
+#
+#     # Apply globally (Swagger will send Authorization header automatically)
+#     openapi_schema["security"] = [
+#         {"BearerAuth": []}
+#     ]
+#
+#     app.openapi_schema = openapi_schema
+#     return app.openapi_schema
+#
+#
+# app.openapi = custom_openapi
 
 # ------------------------------
 # Root health/info endpoint
@@ -119,7 +178,19 @@ async def read_root():
         },
     }
 
+@app.get("/scalar", include_in_schema=False)
+async def scalar_docs():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title=f"{settings.APP_NAME} API Reference",
 
+        layout=Layout.MODERN,
+        dark_mode=True,
+
+        persist_auth=True,  # JWT stays in browser
+        hide_models=False,
+        hide_search=False,
+    )
 # ------------------------------
 # Uvicorn runner (when executed directly)
 # ------------------------------

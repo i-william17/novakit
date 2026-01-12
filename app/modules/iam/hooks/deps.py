@@ -50,11 +50,11 @@ def require_permission(permission_name: str):
 
 #
 # from fastapi import Depends
-# from app.core.nova import nova
+# from app.core.nova.py import nova.py
 # from app.modules.iam.security.auth import decode_token
 #
 #
 # async def get_current_user(token: str = Depends(oauth2_scheme)):
 #     user = await decode_token(token)
-#     nova.user.set(user)     # <--- THE MAGIC
+#     nova.py.user.set(user)     # <--- THE MAGIC
 #     return user

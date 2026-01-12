@@ -1,3 +1,15 @@
+scalar-fastapi
+aiohttp
+geoip2
+django-qrcode
+pyotp
+booktype
+fastapi-limiter
+pytest
+aioredis
+slowapi
+fastapi-cache
+contextvars
 psutil
 uliweb-alembic
 starlette

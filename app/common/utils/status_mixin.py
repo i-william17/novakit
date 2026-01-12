@@ -2,7 +2,7 @@ from typing import Dict, Tuple
 
 class StatusMixin:
     """
-    Port of novatron\novakit\utils\Status
+    Port of novatron novakit utilsStatus
 
     Usage:
         mixin = StatusMixin()

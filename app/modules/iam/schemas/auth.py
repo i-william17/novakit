@@ -9,18 +9,6 @@ class LoginInput(BaseModel):
     email: EmailStr
     password: str
 
-    async def validate_credentials(self, db: AsyncSession):
-        user = await User.get_by_email(db, self.email)
-
-        if not user:
-            return None, "Invalid email or password"
-
-        if not pwd_context.verify(self.password, user.password_hash):
-            return None, "Invalid email or password"
-
-        return user, None
-
-
 
 class ChangePasswordInput(BaseModel):
     old_password: str = Field(..., min_length=1)

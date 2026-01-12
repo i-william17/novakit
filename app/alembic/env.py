@@ -9,12 +9,49 @@ import pkgutil, importlib
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from app.common.base.base_model import Base
+from pathlib import Path
 import app.modules as modules_root
+
+
+def discover_module_migration_paths() -> list[str]:
+    """
+    Find all module migration version directories.
+    Example:
+      app/modules/iam/migrations/versions
+    """
+    paths = []
+
+    modules_base = Path(modules_root.__file__).parent
+
+    for module_dir in modules_base.iterdir():
+        if not module_dir.is_dir():
+            continue
+
+        migrations_dir = module_dir / "migrations" / "versions"
+        if migrations_dir.exists():
+            paths.append(str(migrations_dir.resolve()))
+
+    return paths
 
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# -------------------------------------------
+# Register ALL migration locations
+# -------------------------------------------
+
+base_versions = Path(__file__).parent / "versions"
+module_versions = discover_module_migration_paths()
+
+all_version_locations = [str(base_versions.resolve()), *module_versions]
+
+config.set_main_option(
+    "version_locations",
+    " ".join(all_version_locations)
+)
+
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -22,8 +59,8 @@ fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
+# from myapp import model
+# target_metadata = model.Base.metadata
 # target_metadata = None
 
 

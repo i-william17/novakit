@@ -331,3 +331,43 @@ app/
          ├── pagination.py
          └── response.py
 
+
+
+
+
+YOUR NOVAKIT LAYERS (Final Clean Mapping)
+1. ORM Model = Yii2 ActiveRecord
+app/modules/iam/models/user.py
+
+2. Repository = Custom layer (Yii2 doesn't have this)
+app/modules/iam/repositories/user_repository.py
+
+
+This is optional—Yii2 does not use repositories.
+
+3. Service Layer = Yii2 model logic
+app/modules/iam/services/user_service.py
+
+
+This represents Yii2 methods like:
+
+setPassword()
+
+validatePassword()
+
+generateAuthKey()
+
+generateJWT()
+
+afterSave()
+
+updatePasswordHistory()
+
+4. Controller = Yii2 Controllers
+app/modules/iam/controllers/auth_controller.py (example)
+
+5. Schemas = Yii2 has no equivalent
+UserCreate, UserOut
+
+
+These are FastAPI DTOs.

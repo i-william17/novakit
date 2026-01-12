@@ -8,7 +8,6 @@ htmlcov
 .venv
 venv
 .vscode
-main2.py
 /test-results/
 /playwright-report/
 /blob-report/

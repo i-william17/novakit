@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-# from config.config import settings  
 from app.core.logging.logging_config import setup_logging
 from app.core.cache.cache import init_cache, close_cache
 from app.ws.redis_pubsub import redis_pubsub
@@ -47,10 +46,13 @@ async def boot(app):
     """
     logger.info("Bootstrapping Cypher Server subsystems...")
     
-    await init_db()  
+    await init_db(app)
     
     await init_cache()
     await redis_pubsub.connect()
+
+    app.state.redis = redis_pubsub
+
     asyncio.create_task(periodic_broadcast())
 
     # Register shutdown cleanup

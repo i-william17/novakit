@@ -1,19 +1,46 @@
-from fastapi import APIRouter
+from typing import Callable
+from fastapi import APIRouter, Depends
+
+from app.core.router import create_module_router
+
+def route(method: str, path: str, *, auth: bool | None = None, **options):
+    """
+    Decorator for controller methods.
+    """
+    method = method.lower()
+
+    def decorator(func: Callable):
+        if not hasattr(func, "_route_info"):
+            func._route_info = []
+        func._route_info.append((method, path, auth, options))
+        return func
+
+    return decorator
+
 
 class BaseController:
+    module: str = None
+    tags: list[str] | None = None
+
     router: APIRouter
 
-    def register_routes(self) -> None:
-        """
-        Find methods with `_route_info` and register them to self.router.
-        The decorated method still receives `self` when called by FastAPI,
-        so route function must be async and accept (self, ...).
-        """
+    def __init__(self):
+        if not self.module:
+            raise RuntimeError(
+                f"{self.__class__.__name__} must define `module`"
+            )
+
+        self.router = create_module_router(
+            module=self.module,
+            tags=self.tags,
+        )
+
+        self.register_routes()
+
+    def register_routes(self):
         for attr_name in dir(self):
             attr = getattr(self, attr_name)
+
             if callable(attr) and hasattr(attr, "_route_info"):
-                for method, path, options in getattr(attr, "_route_info"):
-                    # bind method to router
-                    router_method = getattr(self.router, method)
-                    # attach the function directly; FastAPI will call it and pass self implicitly
-                    router_method(path, **options)(attr)
+                for method, path, auth, options in attr._route_info:
+                    getattr(self.router, method)(path, **options)(attr)
