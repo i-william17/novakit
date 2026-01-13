@@ -13,3 +13,5 @@ venv
 /blob-report/
 /playwright/.cache/
 backend/venv
+app/common/shared/
+app/api/

@@ -95,7 +95,7 @@ class CommonConfig(BaseSettings):
     # ============================================================
     SECRET_KEY: str = secrets.token_urlsafe(32)
 
-    JWT_SECRET_KEY: str = "836abbf2d3ddf8555e88cc3b84ddb863205f26f51d2edccee5918b6902507362"
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
 
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7

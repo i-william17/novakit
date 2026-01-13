@@ -101,7 +101,7 @@ if cors_origins:
 app.add_middleware(
     AuthMiddleware,
     safe_endpoints=settings.safe_endpoints,
-    secret_key=getattr(settings, "SECRET_KEY", None),
+    secret_key=getattr(settings, "JWT_SECRET_KEY", None),
     algorithm=getattr(settings, "JWT_ALGORITHM", "HS256"),
     allow_cookie_refresh=True,  # Accept refresh_token from cookies if needed
 )

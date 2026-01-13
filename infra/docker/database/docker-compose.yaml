@@ -1,0 +1,188 @@
+services:
+  mariadb:
+    restart: always
+    image: mariadb:10.6.4
+    container_name: "mariadb"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    volumes:
+      - ./mariadb:/var/lib/mysql
+    networks:
+      shared:
+        ipv4_address: 172.20.0.2
+  postgresql:
+    image: postgres
+    restart: always
+    container_name: "postgresql"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5452:5432"
+    volumes:
+      # - ./postgresql/:/var/lib/postgresql/data/
+      - ./postgresql:/var/lib/postgresql
+    networks:
+      shared:
+        ipv4_address: 172.20.0.3
+  phpmyadmin:
+    restart: always
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: "phpmyadmin"
+    ports:
+      - "81:80"
+    environment:
+      - PMA_HOST=mariadb
+      - UPLOAD_LIMIT=300M
+    depends_on:
+      - mariadb
+    networks:
+      shared:
+        ipv4_address: 172.20.0.4
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: always
+    container_name: "pgadmin"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@crackit.co.ke
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "84:80"
+    volumes:
+    - ./configurations/pgadmin/:/var/lib/pgadmin
+    networks:
+      shared:
+        ipv4_address: 172.20.0.5
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: always
+    container_name: mssql-server
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "Qrpbcd8w8pp2wdC"
+      ACCEPT_EULA: "Y"
+    volumes:
+      - ./mssql/:/var/opt/mssql
+    networks:
+      shared:
+        ipv4_address: 172.20.0.6
+  redisv1:
+    image: redis:latest
+    restart: always
+    container_name: redis-serverv1
+    command: redis-server --requirepass root
+    volumes:
+      - ./redis/data/:/var/lib/redis
+      - ./redis/config/:/usr/local/etc/redis/redis.conf
+    ports:
+      - 6369:6379
+    networks:
+      shared:
+        ipv4_address: 172.20.0.7
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+      REDIS_HOSTS: redisv1
+      REDIS_HOST: redisv1
+      REDIS_PORT: redisv1:6379
+      REDIS_PASSWORD: root
+      HTTP_USER: root
+      HTTP_PASSWORD: root
+    ports:
+      - 82:8081
+    networks:
+      shared:
+        ipv4_address: 172.20.0.8
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    ports:
+      - '28017:27017'
+    volumes:
+      - ./mongodb/:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root  # Set root username
+      MONGO_INITDB_ROOT_PASSWORD: root  # Set root password
+    networks:
+      shared:
+        ipv4_address: 172.20.0.9
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: always
+    ports:
+      - "83:8081"  # Expose Mongo Express on port 8081
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb  # MongoDB server service name
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root  # Admin username
+      ME_CONFIG_MONGODB_ADMINPASSWORD: root  # Admin password
+      ME_CONFIG_BASICAUTH_USERNAME: root  # Basic auth username for web interface
+      ME_CONFIG_BASICAUTH_PASSWORD: root  # Basic auth password for web interface
+    depends_on:
+      - mongodb
+    networks:
+      shared:
+        ipv4_address: 172.20.0.10
+  rabbitmqv1:
+    image: rabbitmq:management-alpine
+    container_name: rabbitmqv1
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=root
+    ports:
+      - 5666:5672
+      - 88:15672
+    volumes:
+      - ./rabbitmq/:/var/lib/rabbitmq
+    networks:
+      shared:
+        ipv4_address: 172.20.0.11
+
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9500:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      shared:
+        ipv4_address: 172.20.0.30
+
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - "9022:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      shared:
+        ipv4_address: 172.20.0.29
+
+
+
+networks:
+  shared:
+    external: true
+    name: shared
