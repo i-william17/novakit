@@ -3,7 +3,7 @@ from fastapi import Depends, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.base_controller import BaseController, route
+from app.core.base_controller import BaseController, route
 from app.core.router import create_module_router
 
 from app.common.db.sessions import get_db
@@ -38,23 +38,6 @@ class AuthController(BaseController):
         self.user_service = UserService()
         self.register_routes()
 
-    # ------------------------------------------------------
-    # HELPERS
-    # ------------------------------------------------------
-    def payload_response(self, data, meta=None, status_code=200):
-        return JSONResponse(
-            content={"dataPayload": data, **(meta or {})},
-            status_code=status_code,
-        )
-
-    def error_response(self, errors, status_code=400):
-        return JSONResponse(
-            content={"errors": errors, "statusCode": status_code},
-            status_code=status_code
-        )
-
-    def alertify_response(self, meta, status_code=200):
-        return JSONResponse(content=meta, status_code=status_code)
 
     # ------------------------------------------------------
     # LOGIN
@@ -109,15 +92,13 @@ class AuthController(BaseController):
 
         # Response
         return self.payload_response(
-            data={
+            data= [{
                 "access_token": access_token,
-                "userData": user.username,  # your custom property
-            },
-            meta={
-                "statusCode": 200,
-                "message": "Access granted",
-                "type": "toast",
-            },
+                "username": user.username,
+            }],
+            message = "Access granted",
+            status_code = 200,
+            type = "toast"
         )
 
     # ------------------------------------------------------
@@ -144,14 +125,12 @@ class AuthController(BaseController):
         except ValueError as exc:
             return self.error_response(str(exc), status_code=422)
 
+
         return self.payload_response(
-            data=response.model_dump_json(),
-            meta={
-                "statusCode": 201,
-                "message": "Account created successfully",
-                "type": "toast",
-            },
-            status_code=201,
+            data= response.model_dump_json(),
+            message="Account created successfully",
+            status_code=200,
+            type="toast"
         )
 
     # ------------------------------------------------------
@@ -167,10 +146,10 @@ class AuthController(BaseController):
         masked = request.cookies.get("refresh_token")
 
         if not masked:
-            return self.alertify_response({
-                "statusCode": 401,
-                "type": {"route": "/login"}
-            }, status_code=401)
+            return self.alertify_response(
+                message  =  "",
+                type = "route login"
+            )
 
         refresh_token = masked
 
@@ -181,7 +160,7 @@ class AuthController(BaseController):
                 "statusCode": 401,
                 "message": "Session has expired",
                 "type": {"route": "iam/auth/login"}
-            }, status_code=401)
+            })
 
         user = await self.user_repo.get_by_id(db, token_model.user_id)
 
@@ -189,17 +168,17 @@ class AuthController(BaseController):
             await self.user_repo.purge_refresh_tokens(db, token_model.user_id)
             await db.commit()
 
-            return self.alertify_response({
-                "statusCode": 401,
-                "message": "Your account has been deactivated.",
-                "type": {"route": "iam/auth/login"}
-            }, status_code=401)
+            return self.alertify_response(
+                message = "Your account has been deactivated.",
+                theme = "success",
+                type = "toast"
+            )
 
         # rotate refresh token
         await self.generate_refresh_token(user, request, response, db)
         new_access_token = generate_jwt_access_token(user)
 
-        return self.payload_response({"access_token": new_access_token})
+        return self.payload_response(data = [{"access_token": new_access_token}])
 
     # ------------------------------------------------------
     # LOGOUT
@@ -238,19 +217,18 @@ class AuthController(BaseController):
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(UserService().require_login)
     ):
+
         error = await body.validate_business_rules(db, current_user)
         if error:
             return self.error_response(error)
 
         await self.user_service.change_password(db, current_user, body)
 
-        return self.alertify_response({
-            "statusCode": 200,
-            "type": {
-                "route": "iam/auth/login",
-                "message": "Please login with your new password."
-            }
-        })
+        return self.alertify_response(
+            message = "Please login with your new password.",
+            theme = "success",
+            type = "toast"
+         )
 
     # ------------------------------------------------------
     # REQUEST RESET PASSWORD
@@ -266,13 +244,12 @@ class AuthController(BaseController):
         if not sent:
             return self.error_response({"email": ["Could not send email"]})
 
-        return self.alertify_response({
-            "statusCode": 200,
-            "type": {
-                "route": "iam/auth/login",
-                "message": "Password reset link has been sent to your email."
-            }
-        })
+        return self.payload_response(
+            data= [],
+            message="Password reset link has been sent to your email",
+            status_code=200,
+            type="toast"
+        )
 
     # ------------------------------------------------------
     # RESET PASSWORD

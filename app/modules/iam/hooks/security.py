@@ -31,12 +31,8 @@ def get_access_token_expiry() -> datetime:
 # -----------------------------
 # SECRET KEY
 # -----------------------------
-def get_secret_key() -> str:
-    return hashlib.sha256(
-        (settings.APP_ID + settings.SECRET_KEY).encode()
-    ).hexdigest()
-
-
+def get_jwt_secret() -> str:
+    return settings.JWT_SECRET_KEY
 # -----------------------------
 # JWT GENERATION
 # -----------------------------
@@ -47,16 +43,28 @@ def generate_jwt_access_token(user: Any) -> str:
         "sub": str(user.user_id),   # IMPORTANT
         "exp": expire,
         "iat": datetime.now(timezone.utc),
-        "jti": user.auth_key,
+        # "jti": user.auth_key,
+        "jti": hashlib.sha256(
+            f"{user.user_id}:{datetime.now(timezone.utc).timestamp()}".encode()
+        ).hexdigest()
+
     }
 
-    return jwt.encode(payload, get_secret_key(), algorithm="HS256")
+    # print(
+    #     "GEN SECRET:",
+    #     repr(settings.JWT_SECRET_KEY),
+    #     "HASH:",
+    #     hashlib.sha256(settings.JWT_SECRET_KEY.encode()).hexdigest()
+    # )
+
+    return jwt.encode(payload, get_jwt_secret(), algorithm=settings.JWT_ALGORITHM)
 
 
 def decode_jwt(token: str) -> Dict:
     return jwt.decode(
         token,
-        get_secret_key(),
-        algorithms=["HS256"],
+        get_jwt_secret(),
+        algorithms=[settings.JWT_ALGORITHM],
         options={"verify_aud": False}
     )
+

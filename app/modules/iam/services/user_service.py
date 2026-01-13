@@ -210,14 +210,12 @@ class UserService:
             db: AsyncSession = Depends(get_db),
     ) -> User:
 
-        auth = getattr(request.state, "auth", None)
+        payload = getattr(request.state, "jwt_payload", None)
 
-        if not auth:
+        if not payload:
             raise HTTPException(status_code=401, detail="Authentication required")
 
-        payload = auth["payload"]
         user_id = payload.get("sub")
-
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
 

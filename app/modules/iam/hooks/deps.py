@@ -36,6 +36,35 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], sessio
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
+# async def get_current_user(
+#     request: Request,
+#     db: AsyncSession = Depends(get_db),
+# ):
+#     payload = getattr(request.state, "jwt_payload", None)
+#
+#     # fallback for CLI / tests / background jobs
+#     if payload is None:
+#         auth = request.headers.get("Authorization")
+#         if not auth:
+#             raise HTTPException(status_code=401, detail="Authentication required")
+#
+#         scheme, _, token = auth.partition(" ")
+#         if scheme.lower() != "bearer" or not token:
+#             raise HTTPException(status_code=401, detail="Invalid authorization header")
+#
+#         payload = decode_jwt(token)
+#
+#     user_id = payload.get("sub")
+#     if not user_id:
+#         raise HTTPException(status_code=401, detail="Invalid token payload")
+#
+#     user = await repo.get_by_id(db, user_id)
+#     if not user:
+#         raise HTTPException(status_code=401, detail="User no longer exists")
+#
+#     return user
+
+
 def require_permission(permission_name: str):
     async def _checker(current_user: User = Depends(get_current_user)):
         # Here you should call your RBAC/authManager layer to check if user has permission
