@@ -1,3 +1,4 @@
+import hashlib
 from typing import Callable, Set, Optional
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -29,7 +30,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         else:
             self.safe_endpoints = settings.safe_endpoints
 
-        self.secret_key = secret_key or getattr(settings, "SECRET_KEY")
+        # self.secret_key = secret_key or settings.JWT_SECRET_KEY
+        self.secret_key = (secret_key or settings.JWT_SECRET_KEY).strip().strip('"').strip("'")
         self.algorithm = algorithm or getattr(settings, "JWT_ALGORITHM", "HS256")
         self.allow_cookie_refresh = allow_cookie_refresh
 
@@ -81,7 +83,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if auth:
             parts = auth.split()
             if len(parts) == 2 and parts[0].lower() == "bearer":
-                return parts[1]
+                # return parts[1]
+                return parts[1].strip()
         # fallback: cookie (if enabled)
         if self.allow_cookie_refresh:
             cookie = request.cookies.get("access_token") or request.cookies.get("refresh_token")
@@ -91,12 +94,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     def _validate_token(self, token: str) -> dict:
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            # print("JWT SECRET USED:", self.secret_key)
+            # print("JWT TOKEN:", token)
+            # print(
+            #     "MW SECRET:",
+            #     repr(self.secret_key),
+            #     "HASH:",
+            #     hashlib.sha256(self.secret_key.encode()).hexdigest()
+            # )
+
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm], options={
+                "verify_aud": False,
+                "verify_iat": False,
+            })
+            # print("JWT PAYLOAD:", payload)
             return payload
         except ExpiredSignatureError as ex:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-        except InvalidTokenError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        except InvalidTokenError as e:
+            # print(f"DECODE ERROR: {str(e)}")
+            raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
     async def dispatch(self, request: Request, call_next: Callable):
         # allow OPTIONS and docs/health etc
@@ -122,6 +139,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "ip": request.client.host if request.client else None,
                 "ua": request.headers.get("User-Agent"),
             }
+
+            request.state.jwt_payload = payload
+            request.state.jwt_token = token
 
             # backward-compat shortcut
             request.state.user = payload
