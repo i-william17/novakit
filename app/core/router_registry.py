@@ -5,6 +5,7 @@ from app.modules.main.controllers.default_controller import  router as main_rout
 from app.modules.iam.controllers.http.user_controller import  router as iam_router
 from app.modules.iam.controllers.http.auth_controller  import  router as iam_auth_router
 from app.modules.main.controllers.setting_controller  import  router as main_setting_router
+from app.modules.main.controllers.sponsor_controller  import  router as sponsor_router 
 
 
 
@@ -17,6 +18,7 @@ def register_routes(app: FastAPI):
     app.include_router(main_router, prefix="/v1/main", tags=["Main"])
     app.include_router(main_setting_router, prefix="/v1/main", tags=["Settings"])
 
+    app.include_router(sponsor_router, prefix="/v1/sponsor", tags=["Sponsor"])
 
 
     # app.include_router(user_router, prefix="/api/v1/users", tags=["Users"])
